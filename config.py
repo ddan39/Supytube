@@ -41,7 +41,7 @@ def configure(advanced):
 
 
 Supytube = conf.registerPlugin('Supytube')
-conf.registerGlobalValue(Supytube, 'api_key', registry.String('', 'Youtube API key: https://developers.google.com/youtube/registering_an_application'))
+conf.registerGlobalValue(Supytube, 'api_key', registry.String('', 'Youtube API key: https://developers.google.com/youtube/registering_an_application', private=True))
 # This is where your configuration variables (if any) should go.  For example:
 # conf.registerGlobalValue(Supytube, 'someConfigVariableName',
 #     registry.Boolean(False, """Help for someConfigVariableName."""))
