@@ -36,7 +36,6 @@ import supybot.callbacks as callbacks
 import supybot.ircmsgs as ircmsgs
 #import supybot.conf as conf
 #import supybot.log as log
-import urlparse
 from apiclient.discovery import build
 from apiclient.errors import HttpError
 
@@ -52,13 +51,12 @@ class Supytube(callbacks.Plugin):
         self.service = build('youtube', 'v3', developerKey=api_key)
 
     def getVideoid(self, msg):
-        for word in msg.args[1].split(' '):
-            if(word.find("youtube") != -1):
-                ## get
-                videoid = urlparse.parse_qs(urlparse.urlsplit(word).query)['v'][0]
-                return videoid
-            elif word.find('youtu.be') != -1:
-                videoid = urlparse.urlsplit(word).path.strip('/')
+        for word in msg.args[1].split():
+            if 'youtube' in word and 'v=' in word:
+                pos = word.find('v=')
+                return word[pos+2:pos+13]
+            elif 'youtu.be' in word:
+                videoid = word.split('/')[-1]
                 self.log.info(videoid)
                 return videoid
 
@@ -71,8 +69,8 @@ class Supytube(callbacks.Plugin):
         return '{:.2%}'.format(rating)
 
     def doPrivmsg(self, irc, msg):
-        if(self.registryValue('enable', msg.args[0]) and
-                (msg.args[1].find("youtube") != -1 or msg.args[1].find('youtu.be') != -1)):
+        if (self.registryValue('enable', msg.args[0]) and
+                ('youtube' in msg.args[1] or 'youtu.be' in msg.args[1])):
             vid = self.getVideoid(msg)
             if vid:
                 self.log.debug('videoid = {0}'.format(id))
