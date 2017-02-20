@@ -1,5 +1,6 @@
 ###
 # Copyright (c) 2007, Benjamin Rubin
+# Copyright (c) 2017, Dan39
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -49,6 +50,7 @@ class Supytube(callbacks.Plugin):
         self.__parent.__init__(irc)
         api_key = self.registryValue('api_key')
         self.service = build('youtube', 'v3', developerKey=api_key)
+        self.results = {}
 
     def getVideoid(self, msg):
         for word in msg.args[1].split():
@@ -79,19 +81,89 @@ class Supytube(callbacks.Plugin):
                             id=vid,
                             fields='items(snippet(title),statistics)').execute()
                     video = results['items'][0]
-                except HttpError, e:
+                except HttpError as e:
                     self.log.error('Supytube.py: Error: {0}'.format(e))
                     return
                 try:
                     rating = ircutils.bold(self.convertRating(video))
-                except AttributeError, e:
+                except (AttributeError, ZeroDivisionError) as e:
                     rating = ircutils.bold('n/a')
 
                 title = ircutils.bold(video['snippet']['title']).encode('utf-8', 'replace')
                 views = ircutils.bold('{:,}'.format(int(video['statistics']['viewCount'])))
-                reply = 'Title: {0}, Views {1}, Rating: {2}'.format(title, views, rating)
+                reply = u'Title: {0}, Views {1}, Rating: {2}'.format(title, views, rating)
                 irc.queueMsg(ircmsgs.privmsg(msg.args[0], reply))
             else:
                 irc.noReply()
+
+    def getVidInfo(self, irc, vid):
+        video = self.service.videos().list(part='id,snippet,statistics',
+                id=vid,
+                fields='items(snippet(description,tags,title),statistics)').execute()
+        video = video['items'][0]
+
+        try:
+            rating = ircutils.bold(self.convertRating(video))
+        except (AttributeError, ZeroDivisionError) as e:
+            rating = ircutils.bold('n/a')
+
+        title = ircutils.bold(video['snippet']['title']).encode('utf-8', 'replace')
+        views = ircutils.bold('{:,}'.format(int(video['statistics']['viewCount'])))
+
+
+        irc.reply(u'https://youtu.be/{} - {}, Views {}, Rating {}'.format(vid, title, views, rating), prefixNick=False)
+        irc.reply(u'\x1FDescription:\x1F {}'.format(video['snippet']['description'].replace('\n', ' ')), prefixNick=False)
+        irc.reply(u'\x1FTags:\x1F {}'.format(', '.join(video['snippet']['tags'][:10])), prefixNick=False)
+
+    def youtube(self, irc, msg, args, opts, text):
+        """[-v | --views] <search string>
+        Search for a youtube video. Add -v or --views to sort by view count instead of relevance"""
+
+        orderby = 'relevance'
+
+        for opt,val in opts:
+            if opt == 'v' or opt == 'views':
+                orderby = 'viewCount'
+
+        resp = self.service.search().list(
+                q=text,
+                part="id,snippet",
+                type="video",
+                order=orderby,
+                safeSearch='none',
+                maxResults=20).execute()
+
+        if len(resp['items']) == 0:
+            irc.reply('No results')
+            return
+
+        self.results[msg.nick] = resp
+
+        vid = resp['items'].pop(0)['id']['videoId']
+
+        self.getVidInfo(irc, vid)
+
+    youtube = wrap(youtube, [getopts({'v': '', 'views': ''}), 'text'])
+
+    def ytn(self, irc, msg, args):
+        """Grabs next youtube result"""
+
+        if msg.nick not in self.results:
+            irc.error('You havnt made a search yet')
+            return
+
+        items = self.results[msg.nick]['items']
+
+        if len(items) == 0:
+            irc.error('No more results')
+            return
+
+        vid = items.pop(0)['id']['videoId']
+
+        self.getVidInfo(irc, vid)
+
+    ytn = wrap(ytn)
+
+
 
 Class = Supytube
