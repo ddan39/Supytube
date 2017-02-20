@@ -113,7 +113,10 @@ class Supytube(callbacks.Plugin):
 
         irc.reply(u'https://youtu.be/{} - {}, Views {}, Rating {}'.format(vid, title, views, rating), prefixNick=False)
         irc.reply(u'\x1FDescription:\x1F {}'.format(video['snippet']['description'].replace('\n', ' ')), prefixNick=False)
-        irc.reply(u'\x1FTags:\x1F {}'.format(', '.join(video['snippet']['tags'][:10])), prefixNick=False)
+        try:
+            irc.reply(u'\x1FTags:\x1F {}'.format(', '.join(video['snippet']['tags'][:10])), prefixNick=False)
+        except KeyError:
+            pass
 
     def youtube(self, irc, msg, args, opts, text):
         """[-v | --views] <search string>
