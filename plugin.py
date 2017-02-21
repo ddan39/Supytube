@@ -93,7 +93,7 @@ class Supytube(callbacks.Plugin):
                     rating = ircutils.bold('n/a')
 
                 title = ircutils.bold(video['snippet']['title'])
-                title = unicodedata.normalize('NFKD',title)
+                title = unicodedata.normalize('NFKD', title)
 
                 if 'duration' in video['contentDetails']:
                     length = isodate.parse_duration(video['contentDetails']['duration'])
@@ -107,7 +107,7 @@ class Supytube(callbacks.Plugin):
             else:
                 irc.noReply()
 
-    def getVidInfo(self, irc, vid):
+    def getVidInfo(self, irc, vid, dodescription, dotags):
         video = self.service.videos().list(part='id,contentDetails,snippet,statistics',
                 id=vid,
                 fields='items(contentDetails,snippet(description,tags,title),statistics)').execute()
@@ -119,7 +119,7 @@ class Supytube(callbacks.Plugin):
             rating = ircutils.bold('n/a')
 
         title = ircutils.bold(video['snippet']['title'])
-        title = unicodedata.normalize('NFKD',title)
+        title = unicodedata.normalize('NFKD', title)
 
         views = ircutils.bold('{:,}'.format(int(video['statistics']['viewCount'])))
 
@@ -130,21 +130,32 @@ class Supytube(callbacks.Plugin):
             length = 'N/A'
 
         irc.reply(u'https://youtu.be/{} - {}, Views {}, Rating {}, Length {}'.format(vid, title, views, rating, length), prefixNick=False)
-        irc.reply(u'\x1FDescription:\x1F {}'.format(video['snippet']['description'].replace('\n', ' ')), prefixNick=False)
-        try:
-            irc.reply(u'\x1FTags:\x1F {}'.format(', '.join(video['snippet']['tags'][:10])), prefixNick=False)
-        except KeyError:
-            pass
+        if dodescription:
+            desc = video['snippet']['description']
+            desc = ' '.join(desc.split())
+            desc = unicodedata.normalize('NFKD', desc)
+            irc.reply(u'\x1FDescription:\x1F {}'.format(desc), prefixNick=False)
+        if dotags:
+            try:
+                irc.reply(u'\x1FTags:\x1F {}'.format(', '.join(video['snippet']['tags'][:10])), prefixNick=False)
+            except KeyError:
+                pass
 
     def youtube(self, irc, msg, args, opts, text):
-        """[-v | --views] <search string>
-        Search for a youtube video. Add -v or --views to sort by view count instead of relevance"""
+        """[-v | --views] [-d | --description] <search string>
+        Search for a youtube video. -v or --views to sort by view count instead of relevance. -d or --description adds extra line with full description. -t or --tags adds Tags line."""
 
         orderby = 'relevance'
+        dodescription = False
+        dotags = False
 
         for opt,val in opts:
             if opt == 'v' or opt == 'views':
                 orderby = 'viewCount'
+            elif opt == 'd' or opt == 'description':
+                dodescription = True
+            elif opt == 't' or opt == 'tags':
+                dotags = True
 
         resp = self.service.search().list(
                 q=text,
@@ -162,11 +173,11 @@ class Supytube(callbacks.Plugin):
 
         vid = resp['items'].pop(0)['id']['videoId']
 
-        self.getVidInfo(irc, vid)
+        self.getVidInfo(irc, vid, dodescription, dotags)
 
-    youtube = wrap(youtube, [getopts({'v': '', 'views': ''}), 'text'])
+    youtube = wrap(youtube, [getopts({'v': '', 'views': '', 'd': '', 'description': '', 't': '', 'tags': ''}), 'text'])
 
-    def ytn(self, irc, msg, args):
+    def ytn(self, irc, msg, args, opts):
         """Grabs next youtube result"""
 
         if msg.nick not in self.results:
@@ -179,11 +190,20 @@ class Supytube(callbacks.Plugin):
             irc.error('No more results')
             return
 
+        dodescription = False
+        dotags = False
+
+        for opt,val in opts:
+            if opt == 'd' or opt == 'description':
+                dodescription = True
+            elif opt == 't' or opt == 'tags':
+                dotags = True
+
         vid = items.pop(0)['id']['videoId']
 
-        self.getVidInfo(irc, vid)
+        self.getVidInfo(irc, vid, dodescription, dotags)
 
-    ytn = wrap(ytn)
+    ytn = wrap(ytn, [getopts({'d': '', 'description': '', 't': '', 'tags': ''})])
 
 
 
