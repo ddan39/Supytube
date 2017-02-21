@@ -40,6 +40,7 @@ import supybot.ircmsgs as ircmsgs
 from apiclient.discovery import build
 from apiclient.errors import HttpError
 
+import isodate
 import unicodedata
 
 class Supytube(callbacks.Plugin):
@@ -79,9 +80,9 @@ class Supytube(callbacks.Plugin):
             if vid:
                 self.log.debug('videoid = {0}'.format(id))
                 try:
-                    results = self.service.videos().list(part='id,snippet,statistics',
+                    results = self.service.videos().list(part='id,contentDetails,snippet,statistics',
                             id=vid,
-                            fields='items(snippet(title),statistics)').execute()
+                            fields='items(contentDetails,snippet/title,statistics)').execute()
                     video = results['items'][0]
                 except HttpError as e:
                     self.log.error('Supytube.py: Error: {0}'.format(e))
@@ -94,16 +95,22 @@ class Supytube(callbacks.Plugin):
                 title = ircutils.bold(video['snippet']['title'])
                 title = unicodedata.normalize('NFKD',title)
 
+                if 'duration' in video['contentDetails']:
+                    length = isodate.parse_duration(video['contentDetails']['duration'])
+                    length = ircutils.bold(length)
+                else:
+                    length = 'N/A'
+
                 views = ircutils.bold('{:,}'.format(int(video['statistics']['viewCount'])))
-                reply = u'Title: {0}, Views {1}, Rating: {2}'.format(title, views, rating)
+                reply = u'Title: {}, Views {}, Rating: {}, Length {}'.format(title, views, rating, length)
                 irc.queueMsg(ircmsgs.privmsg(msg.args[0], reply))
             else:
                 irc.noReply()
 
     def getVidInfo(self, irc, vid):
-        video = self.service.videos().list(part='id,snippet,statistics',
+        video = self.service.videos().list(part='id,contentDetails,snippet,statistics',
                 id=vid,
-                fields='items(snippet(description,tags,title),statistics)').execute()
+                fields='items(contentDetails,snippet(description,tags,title),statistics)').execute()
         video = video['items'][0]
 
         try:
@@ -116,8 +123,13 @@ class Supytube(callbacks.Plugin):
 
         views = ircutils.bold('{:,}'.format(int(video['statistics']['viewCount'])))
 
+        if 'duration' in video['contentDetails']:
+            length = isodate.parse_duration(video['contentDetails']['duration'])
+            length = ircutils.bold(length)
+        else:
+            length = 'N/A'
 
-        irc.reply(u'https://youtu.be/{} - {}, Views {}, Rating {}'.format(vid, title, views, rating), prefixNick=False)
+        irc.reply(u'https://youtu.be/{} - {}, Views {}, Rating {}, Length {}'.format(vid, title, views, rating, length), prefixNick=False)
         irc.reply(u'\x1FDescription:\x1F {}'.format(video['snippet']['description'].replace('\n', ' ')), prefixNick=False)
         try:
             irc.reply(u'\x1FTags:\x1F {}'.format(', '.join(video['snippet']['tags'][:10])), prefixNick=False)
