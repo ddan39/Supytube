@@ -40,6 +40,8 @@ import supybot.ircmsgs as ircmsgs
 from apiclient.discovery import build
 from apiclient.errors import HttpError
 
+import unicodedata
+
 class Supytube(callbacks.Plugin):
     """Add the help for "@plugin help Supytube" here
     This should describe *how* to use this plugin."""
@@ -89,7 +91,9 @@ class Supytube(callbacks.Plugin):
                 except (AttributeError, ZeroDivisionError) as e:
                     rating = ircutils.bold('n/a')
 
-                title = ircutils.bold(video['snippet']['title']).encode('utf-8', 'replace')
+                title = ircutils.bold(video['snippet']['title'])
+                title = unicodedata.normalize('NFKD',title)
+
                 views = ircutils.bold('{:,}'.format(int(video['statistics']['viewCount'])))
                 reply = u'Title: {0}, Views {1}, Rating: {2}'.format(title, views, rating)
                 irc.queueMsg(ircmsgs.privmsg(msg.args[0], reply))
@@ -107,7 +111,9 @@ class Supytube(callbacks.Plugin):
         except (AttributeError, ZeroDivisionError) as e:
             rating = ircutils.bold('n/a')
 
-        title = ircutils.bold(video['snippet']['title']).encode('utf-8', 'replace')
+        title = ircutils.bold(video['snippet']['title'])
+        title = unicodedata.normalize('NFKD',title)
+
         views = ircutils.bold('{:,}'.format(int(video['statistics']['viewCount'])))
 
 
